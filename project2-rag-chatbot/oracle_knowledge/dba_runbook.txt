@@ -1,0 +1,127 @@
+ORACLE DBA RUNBOOK — 12 YEARS OF EXPERIENCE
+By Srikanth | Senior Oracle DBA
+
+=== ORA-04031 — SHARED POOL MEMORY EXHAUSTION ===
+
+What it means:
+Oracle cannot allocate memory in the shared pool.
+This is a critical error that stops new connections.
+
+Step by step fix:
+1. Check shared pool usage immediately:
+   SELECT pool, name, bytes/1024/1024 MB
+   FROM v$sgastat
+   WHERE pool = 'shared pool'
+   ORDER BY bytes DESC
+   FETCH FIRST 10 ROWS ONLY;
+
+2. If free memory below 10 percent flush immediately:
+   ALTER SYSTEM FLUSH SHARED_POOL;
+
+3. Permanent fix resize shared pool:
+   ALTER SYSTEM SET shared_pool_size=512M SCOPE=BOTH;
+
+4. Root cause is non-bind variable SQL from application.
+   Fix: ALTER SYSTEM SET cursor_sharing=FORCE SCOPE=BOTH;
+
+Personal experience:
+ORA-04031 always happens Monday mornings
+when batch jobs run without bind variables.
+Flush gives immediate relief in 2 minutes.
+Application fix is permanent solution.
+Resolution time: 15 to 30 minutes.
+
+=== ORA-01555 — SNAPSHOT TOO OLD ===
+
+What it means:
+A long running query needs undo data
+that has already been overwritten.
+Undo retention period is too short.
+
+Step by step fix:
+1. Check current undo retention:
+   SELECT tablespace_name, retention
+   FROM dba_tablespaces
+   WHERE contents = 'UNDO';
+
+2. Increase retention immediately:
+   ALTER SYSTEM SET undo_retention=3600 SCOPE=BOTH;
+
+3. If still occurring add space to undo tablespace:
+   ALTER TABLESPACE UNDOTBS1
+   ADD DATAFILE '/oracle/data/undo02.dbf' SIZE 2G;
+
+Personal experience:
+Usually happens during month end reports.
+Long running queries conflict with OLTP transactions.
+Schedule reports during off peak hours as permanent fix.
+Resolution time: 30 to 45 minutes.
+
+=== ORA-12541 — TNS NO LISTENER ===
+
+What it means:
+Oracle listener is not running.
+No new connections possible.
+Entire application goes down immediately.
+
+Step by step fix:
+1. Check listener status: lsnrctl status
+2. Start listener: lsnrctl start
+3. Check port 1521: netstat -an | grep 1521
+4. Test connection: tnsping PRODDB
+
+Personal experience:
+Happens after server reboot when listener not auto-start.
+Fix: add listener to Oracle Restart using srvctl.
+Resolution time: 5 to 10 minutes.
+Impact is huge — full application outage immediately.
+
+=== ORA-00060 — DEADLOCK DETECTED ===
+
+What it means:
+Two sessions waiting for each other to release locks.
+Oracle automatically kills one session to resolve.
+
+Step by step fix:
+1. Oracle auto-resolves deadlock automatically.
+2. Find blocking sessions:
+   SELECT s.sid, s.serial#, s.username, s.blocking_session
+   FROM v$session s
+   WHERE s.blocking_session IS NOT NULL;
+
+3. Kill blocking session if needed:
+   ALTER SYSTEM KILL SESSION 'sid,serial#';
+
+Personal experience:
+Root cause always in application code.
+Two transactions updating same rows in different order.
+Resolution time: 15 minutes for immediate fix.
+
+=== DAILY HEALTH CHECK SQL ===
+
+Run every morning first thing:
+SELECT metric_name, value
+FROM v$sysmetric
+WHERE metric_name IN (
+  'Buffer Cache Hit Ratio',
+  'Library Cache Hit Ratio',
+  'Physical Reads Per Sec')
+AND intsize_csec = (SELECT MAX(intsize_csec) FROM v$sysmetric);
+
+Healthy thresholds from experience:
+Buffer Cache Hit Ratio must be above 90 percent always.
+Library Cache Hit Ratio must be above 99 percent always.
+If Buffer Cache below 90 percent increase db_cache_size.
+If Library Cache below 95 percent increase shared_pool_size.
+
+=== RMAN BACKUP PROCEDURES ===
+
+Full backup every Sunday 11PM:
+RMAN> BACKUP DATABASE PLUS ARCHIVELOG;
+RMAN> DELETE OBSOLETE;
+
+Incremental backup Monday to Saturday 11PM:
+RMAN> BACKUP INCREMENTAL LEVEL 1 DATABASE;
+
+Validate backup every week:
+RMAN> BACKUP VALIDATE DATABASE;

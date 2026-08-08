@@ -1,0 +1,56 @@
+PRODUCTION INCIDENT HISTORY
+Real incidents from 12 years of Oracle DBA work
+
+=== INCIDENT 001 — SHARED POOL CRISIS ===
+Error: ORA-04031 occurred 47 times in 2 hours
+Severity: CRITICAL
+Root Cause: New application deployed without bind variables
+Impact: All new connections failing — app completely down
+Resolution: 15 minutes
+Fix: Flushed shared pool then resized to 512M
+Lesson: Always review SQL before deployment to production
+
+=== INCIDENT 002 — LISTENER DOWN ===
+Error: ORA-12541 — full application outage
+Severity: CRITICAL
+Root Cause: Server rebooted after patching — listener not auto-start
+Impact: 100 percent application down for 23 minutes
+Resolution: 23 minutes
+Fix: lsnrctl start then configured Oracle Restart
+Lesson: Always configure auto-start — always test after reboot
+
+=== INCIDENT 003 — UNDO TABLESPACE FULL ===
+Error: ORA-30036 unable to extend undo segment
+Severity: HIGH
+Root Cause: Month-end batch running 6 hours — undo tablespace only 10GB
+Impact: All DML operations failing across application
+Resolution: 45 minutes
+Fix: Killed batch with business approval — added 10GB datafile
+Lesson: Monitor undo usage before month-end — keep 30 percent free
+
+=== INCIDENT 004 — HIGH CPU FROM MISSING INDEX ===
+Problem: CPU at 95 percent for 2 hours — all queries slow
+Severity: HIGH
+Root Cause: Missing index on 50 million row table — full scan on every query
+Impact: Application timeouts for all users
+Resolution: 30 minutes
+Fix: Created index on order_date column — CPU dropped to 15 percent instantly
+Lesson: Always index WHERE clause columns — monitor table growth monthly
+
+=== INCIDENT 005 — BACKUP FAILURE ===
+Problem: Backup failing silently for 3 days
+Severity: CRITICAL
+Root Cause: Archive log destination full — RMAN failing silently
+Impact: 3 days without backup — compliance violation
+Resolution: 2 hours
+Fix: Freed archive log space — ran manual backup immediately
+Lesson: Never assume backup is working — always monitor backup success
+
+=== INCIDENT 006 — DEADLOCK STORM ===
+Error: ORA-00060 occurred 200 times in one hour
+Severity: MEDIUM
+Root Cause: New feature updating two tables in wrong order
+Impact: Random transaction failures for end users
+Resolution: 4 hours including application fix
+Fix: Developer fixed update sequence — deadlocks stopped immediately
+Lesson: Always review lock ordering in code reviews

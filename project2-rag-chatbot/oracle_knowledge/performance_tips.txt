@@ -1,0 +1,70 @@
+ORACLE PERFORMANCE TUNING TIPS
+12 years of production experience
+
+=== FINDING SLOW QUERIES ===
+
+Top SQL by CPU time:
+SELECT sql_id, cpu_time/1000000 cpu_secs,
+       executions, SUBSTR(sql_text,1,100) sql_text
+FROM v$sql
+ORDER BY cpu_time DESC
+FETCH FIRST 10 ROWS ONLY;
+
+Top SQL by buffer gets per execution:
+SELECT sql_id,
+       buffer_gets/DECODE(executions,0,1,executions) bg_per_exec,
+       executions, SUBSTR(sql_text,1,80)
+FROM v$sql
+ORDER BY buffer_gets DESC
+FETCH FIRST 10 ROWS ONLY;
+
+=== INDEX TIPS ===
+
+Find tables with full table scans that need indexes:
+SELECT object_name FROM v$sql_plan sp
+JOIN v$sql s ON sp.sql_id = s.sql_id
+WHERE operation = 'TABLE ACCESS' AND options = 'FULL'
+AND s.executions > 100
+ORDER BY s.buffer_gets DESC;
+
+Always create index on foreign key columns.
+Foreign key columns without indexes cause lock contention.
+Most selective column goes first in composite index.
+Equality conditions before range conditions in index.
+
+=== MEMORY TUNING ===
+
+Check SGA breakdown:
+SELECT name, bytes/1024/1024 MB FROM v$sga;
+
+Check PGA usage:
+SELECT name, value/1024/1024 MB FROM v$pgastat
+WHERE name IN ('total PGA inuse','total PGA allocated');
+
+=== SPACE MANAGEMENT ===
+
+Check tablespace usage:
+SELECT tablespace_name,
+  ROUND(used_percent,2) pct_used
+FROM dba_tablespace_usage_metrics
+ORDER BY used_percent DESC;
+
+Alert when tablespace above 80 percent.
+Add datafile when tablespace getting full:
+ALTER TABLESPACE users
+ADD DATAFILE '/oracle/data/users02.dbf'
+SIZE 10G AUTOEXTEND ON NEXT 1G MAXSIZE 50G;
+
+=== EXECUTION PLAN ANALYSIS ===
+
+Check execution plan:
+EXPLAIN PLAN FOR select_statement_here;
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+Real plan from cursor cache:
+SELECT * FROM TABLE(
+  DBMS_XPLAN.DISPLAY_CURSOR('sql_id_here'));
+
+Force index when optimizer is wrong:
+SELECT /*+ INDEX(table_name index_name) */
+columns FROM table WHERE condition;
